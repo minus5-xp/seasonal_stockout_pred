@@ -1,0 +1,12 @@
+# Python Dependencies for Cruzber BQML Pipeline
+# Track A: OOS Alerting System (h=4 weeks)
+
+# Core BigQuery client (ADC authentication)
+google-cloud-bigquery>=3.10.0
+
+# Optional: Enhanced table operations
+db-dtypes>=1.1.0
+
+# Optional: Interactive notebook support (if running in Jupyter)
+# pandas>=2.0.0
+# matplotlib>=3.7.0

@@ -1,0 +1,214 @@
+# SQL Execution Index for Option B Pipeline
+# Defines canonical execution order for all BigQuery queries
+# Format: YAML with query definitions including dependencies
+
+version: "1.0"
+pipeline: "optionB_full"
+description: "Complete Option B pipeline: features → models → unconstraining → quantiles → policy → evaluation"
+
+# Global parameters (can be overridden per query)
+global_params:
+  dataset_ref: "{dataset_ref}"
+  project_id: "{project_id}"
+  location: "{location}"
+
+# Phase definitions
+phases:
+  - id: "B0"
+    name: "Registry & Infrastructure"
+    description: "Create experiments registry and base infrastructure"
+    
+  - id: "B1"
+    name: "Features & Labels"
+    description: "Feature engineering and label construction"
+    
+  - id: "B2"
+    name: "Model Training"
+    description: "Train BQML models and generate predictions"
+    
+  - id: "B3"
+    name: "Unconstraining & Quantiles"
+    description: "Unconstrain predictions and compute conformal quantiles"
+    
+  - id: "B4"
+    name: "Policy Simulation"
+    description: "Simulate procurement policies"
+    
+  - id: "B5"
+    name: "Evaluation & Reporting"
+    description: "Evaluate models and generate reports"
+
+# Query definitions
+queries:
+  # ========== B0: Registry ==========
+  - id: "b0_registry"
+    path: "sql/registry/00_create_experiments_registry.sql"
+    phase: "B0"
+    description: "Create experiments_registry table"
+    depends_on: []
+    params: {}
+  
+  # ========== B1: Features & Labels ==========
+  - id: "b1_features_spine"
+    path: "sql/features/10_generate_weekly_spine_h4.sql"
+    phase: "B1"
+    description: "Generate weekly temporal spine"
+    depends_on: []
+    
+  - id: "b1_features_core"
+    path: "sql/features/11_features_core_h4.sql"
+    phase: "B1"
+    description: "Core feature engineering"
+    depends_on: ["b1_features_spine"]
+    
+  - id: "b1_labels"
+    path: "sql/features/12_labels_uc_oos_h4.sql"
+    phase: "B1"
+    description: "Construct unconstrained out-of-stock labels"
+    depends_on: ["b1_features_core"]
+  
+  # ========== B2: Model Training ==========
+  - id: "b2_split"
+    path: "sql/models/20_train_val_split_temporal.sql"
+    phase: "B2"
+    description: "Temporal train/val split"
+    depends_on: ["b1_labels"]
+    
+  - id: "b2_train_p_oos"
+    path: "sql/models/21_train_p_oos_h4.sql"
+    phase: "B2"
+    description: "Train P(OOS) logistic regression model"
+    depends_on: ["b2_split"]
+    
+  - id: "b2_score_p_oos"
+    path: "sql/models/22_score_p_oos_h4.sql"
+    phase: "B2"
+    description: "Score P(OOS) on train+val"
+    depends_on: ["b2_train_p_oos"]
+  
+  # ========== B3: Unconstraining & Quantiles ==========
+  - id: "b3_unconstrain_u1"
+    path: "sql/unconstraining/30_apply_U1_ratio_h4.sql"
+    phase: "B3"
+    description: "Apply U1 unconstraining (ratio method)"
+    depends_on: ["b2_score_p_oos"]
+    
+  - id: "b3_unconstrain_u2"
+    path: "sql/unconstraining/31_apply_U2_blended_h4.sql"
+    phase: "B3"
+    description: "Apply U2 unconstraining (blended)"
+    depends_on: ["b3_unconstrain_u1"]
+    
+  - id: "b3_unconstrain_u3"
+    path: "sql/unconstraining/32_apply_U3_final_h4.sql"
+    phase: "B3"
+    description: "Apply U3 unconstraining (final predictions)"
+    depends_on: ["b3_unconstrain_u2"]
+    params:
+      topk: "{topk}"
+    
+  - id: "b3_volatility_buckets"
+    path: "sql/bqml/quantiles_v2/30_volatility_bucketing.sql"
+    phase: "B3"
+    description: "Compute CV-based volatility buckets"
+    depends_on: ["b3_unconstrain_u3"]
+    params:
+      vol_ntiles: "{vol_ntiles}"
+    
+  - id: "b3_calibration_windows"
+    path: "sql/bqml/quantiles_v2/31_define_calibration_windows.sql"
+    phase: "B3"
+    description: "Define calibration windows (CALIB_A/CALIB_B/VAL)"
+    depends_on: ["b3_volatility_buckets"]
+    
+  - id: "b3_mondrian_quantiles"
+    path: "sql/bqml/quantiles_v2/32_mondrian_conformal_quantiles_v2.sql"
+    phase: "B3"
+    description: "Mondrian conformal quantiles with hierarchical fallback"
+    depends_on: ["b3_calibration_windows"]
+    params:
+      n_min: "{n_min}"
+    
+  - id: "b3_tune_coverage"
+    path: "sql/bqml/quantiles_v2/33_tune_segment_coverage_target.sql"
+    phase: "B3"
+    description: "Nested tuning of coverage targets per segment"
+    depends_on: ["b3_mondrian_quantiles"]
+    params:
+      coverage_grid: "{coverage_grid}"
+    
+  - id: "b3_apply_targets"
+    path: "sql/bqml/quantiles_v2/34_apply_targets_and_score_val.sql"
+    phase: "B3"
+    description: "Apply tuned targets to VAL split"
+    depends_on: ["b3_tune_coverage"]
+  
+  # ========== B4: Policy Simulation ==========
+  - id: "b4_policy_inputs"
+    path: "sql/policy/50_prepare_policy_inputs_h4.sql"
+    phase: "B4"
+    description: "Prepare inputs for policy simulation"
+    depends_on: ["b3_apply_targets"]
+    
+  - id: "b4_policy_sim"
+    path: "sql/policy/51_simulate_policies_h4.sql"
+    phase: "B4"
+    description: "Simulate procurement policies"
+    depends_on: ["b4_policy_inputs"]
+    params:
+      topk: "{topk}"
+  
+  # ========== B5: Evaluation ==========
+  - id: "b5_eval_quantiles"
+    path: "sql/eval/40_eval_quantiles_conditional_v2.sql"
+    phase: "B5"
+    description: "Evaluate conditional coverage (Gate B3)"
+    depends_on: ["b3_apply_targets"]
+    
+  - id: "b5_gate_b3"
+    path: "sql/eval/43_check_gate_b3.sql"
+    phase: "B5"
+    description: "Check Gate B3 (conditional coverage)"
+    depends_on: ["b5_eval_quantiles"]
+    
+  - id: "b5_eval_policy"
+    path: "sql/eval/44_eval_policy_performance.sql"
+    phase: "B5"
+    description: "Evaluate policy performance (Gate B4)"
+    depends_on: ["b4_policy_sim"]
+    
+  - id: "b5_gate_b4"
+    path: "sql/eval/45_check_gate_b4.sql"
+    phase: "B5"
+    description: "Check Gate B4 (policy performance)"
+    depends_on: ["b5_eval_policy"]
+    
+  - id: "b5_baselines"
+    path: "sql/baselines/60_eval_baselines_v2.sql"
+    phase: "B5"
+    description: "Evaluate baseline models"
+    depends_on: ["b2_split"]
+    
+  - id: "b5_anti_leakage"
+    path: "sql/anti_leakage/70_anti_leakage_comprehensive.sql"
+    phase: "B5"
+    description: "Run anti-leakage tests"
+    depends_on: ["b2_score_p_oos"]
+
+# Execution notes
+notes: |
+  This index defines the canonical execution order for Option B pipeline.
+  
+  Key decision points:
+  - Split before all modeling (B2_split)
+  - Unconstraining cascade: U1 → U2 → U3
+  - Quantiles v2 with volatility bucketing + nested tuning
+  - Policy simulation uses tuned quantiles
+  - All evaluation runs independently
+  
+  Parameter substitution:
+  - {dataset_ref} = project.dataset
+  - {topk} = top-K threshold for predictions
+  - {n_min} = minimum samples for conformal calibration
+  - {vol_ntiles} = number of volatility buckets
+  - {coverage_grid} = grid of coverage targets to test
