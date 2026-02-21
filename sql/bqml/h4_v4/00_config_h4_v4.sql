@@ -1,0 +1,25 @@
+-- ============================================================================
+-- CONFIG BLOCK h=4 v4
+-- ============================================================================
+-- All scripts in this folder read constants from this block.
+-- To override in production, set the DECLARE values below.
+-- ============================================================================
+--
+-- CANONICAL CONSTANTS (copy-paste into any script that needs them):
+--
+--   PROJECT_ID          = 'thequantitativeledger'
+--   DATASET             = 'cruzber_models_eu'
+--   HORIZON_WEEKS       = 4
+--   BQ_LOCATION         = 'EU'
+--   VERSION_TAG         = 'v4'
+--   DEMAND_ACTIVE_THR   = 5.0          -- amplitude threshold for active-demand scope (Gate B3)
+--   CAP_MULTIPLIER      = 2.0          -- q* cap = CAP_MULTIPLIER * train_calib_99pct by season
+--   MIN_N_TUNE          = 200          -- min calibration obs to trust segment-level factor
+--   B3_LO               = 0.08         -- Gate B3 lower bound viol_rate_p90
+--   B3_HI               = 0.12         -- Gate B3 upper bound viol_rate_p90
+--   B4_LIFT_THRESHOLD   = 1.5          -- Gate B4 minimum acceptable lift
+--   FACTOR_CLIP_LO      = 0.80         -- conformal correction factor lower clip
+--   FACTOR_CLIP_HI      = 1.50         -- conformal correction factor upper clip
+
+-- This file is documentation/reference only.
+-- Execute the numbered scripts 01..09 in order.
