@@ -62,6 +62,7 @@ logs/
 # Status / executive summary reports (local working docs)
 RESUMEN_EJECUTIVO_H4.md
 SITUACION_PROYECTO.md
+INFORME_FORECAST_H4_COMPLETO.md
 # Git LFS
 *.pbix
 *.xlsx
