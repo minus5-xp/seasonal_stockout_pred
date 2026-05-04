@@ -59,9 +59,9 @@ logs/
 *.zip
 !oos_seasonal_fillrate/docs/*.zip
 
-# BigQuery temp
-.bigquery/
-
+# Status / executive summary reports (local working docs)
+RESUMEN_EJECUTIVO_H4.md
+SITUACION_PROYECTO.md
 # Git LFS
 *.pbix
 *.xlsx
