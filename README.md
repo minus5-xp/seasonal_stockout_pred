@@ -10,11 +10,13 @@ Proyecto académico (ISDI MDA — Troncal) de predicción de stockouts estaciona
 
 | Métrica | Valor (LOCKED TEST) |
 |---------|-------------------|
-| Alertas generadas | **27 264** |
-| Precisión | **0.6496** |
-| Recall | **0.3516** |
-| F1 | **0.456** |
-| True OOS events (base) | ~50 367 |
+| **ROC-AUC** (clasificador `p_oos_h12`) | **0.9487** |
+| **PR-AUC** (clasificador `p_oos_h12`) | **0.8956** |
+| Alertas generadas (política v5_1) | **27 264** |
+| Precisión (alerta) | **0.6496** |
+| Recall (alerta) | **0.3516** |
+| F1 (alerta) | **0.456** |
+| True OOS events | 50 367 |
 | Base rate | 23.4% |
 | Lift sobre base rate | ~2.8× |
 | Leakage audit | **20/20 PASS** |
@@ -22,21 +24,30 @@ Proyecto académico (ISDI MDA — Troncal) de predicción de stockouts estaciona
 
 ### ROC-AUC del clasificador base
 
-El clasificador BQML `m_oos_h12_v3_2` (`BOOSTED_TREE_CLASSIFIER`) es el núcleo probabilístico de toda la cadena. Su ROC-AUC puede obtenerse directamente desde BigQuery:
+El núcleo del pipeline es `m_oos_h12_v1` (`BOOSTED_TREE_CLASSIFIER`, BQML). Las probabilidades resultantes (`p_oos_h12`) se evalúan sobre LOCKED_TEST (214 916 observaciones, base rate 23.4%):
 
-```sql
-SELECT *
-FROM ML.EVALUATE(
-  MODEL `thequantitativeledger.cruzber_models_eu.m_oos_h12_v3_2`,
-  (
-    SELECT *
+| Métrica | Valor |
+|---------|-------|
+| **ROC-AUC** | **0.9487** |
+| **PR-AUC** | **0.8956** |
+
+Reproducir el AUC desde Python:
+
+```python
+from google.cloud import bigquery
+from sklearn.metrics import roc_auc_score, average_precision_score
+client = bigquery.Client(project='thequantitativeledger', location='EU')
+df = client.query("""
+    SELECT p_oos_h12, stockout_event_12w
     FROM `thequantitativeledger.cruzber_models_eu.base_scores_h12_v5_2_strict`
     WHERE eval_split_v3 = 'LOCKED_TEST'
-  )
-)
+      AND p_oos_h12 IS NOT NULL AND stockout_event_12w IS NOT NULL
+""").to_dataframe()
+print(roc_auc_score(df['stockout_event_12w'], df['p_oos_h12']))   # 0.9487
+print(average_precision_score(df['stockout_event_12w'], df['p_oos_h12']))  # 0.8956
 ```
 
-Las métricas de alerta (P/R/F1 arriba) evalúan la **política desplegada** (umbral + quotas estacionales), que aplica una transformación adicional sobre las probabilidades del modelo. Ambas métricas son complementarias.
+Las métricas de alerta (P/R/F1) evalúan la **política desplegada** (umbral + quotas estacionales sobre `p_oos_h12`). Ambas dimensiones son complementarias: el AUC mide la capacidad discriminativa del modelo base, P/R miden el rendimiento operativo de la política.
 
 ---
 
