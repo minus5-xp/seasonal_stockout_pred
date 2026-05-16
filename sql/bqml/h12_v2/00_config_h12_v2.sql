@@ -1,0 +1,95 @@
+-- ============================================================================
+-- CONFIG BLOCK h=12 v2
+-- ============================================================================
+-- This file is DOCUMENTATION ONLY — not executed by the runner.
+-- h12_v2 reuses models from h12_v1 (no retraining).
+-- All improvements are in calibration, partitioning, and export.
+-- ============================================================================
+--
+-- SOURCE VERSION:     h12_v1  (models m_oos_h12_v1, m_demand_h12_v1, m_platt_oos_h12_v1)
+-- BQML TRAINING:      NONE — v2 recalibrates only
+--
+-- TEMPORAL PARTITIONS (v2 — finer than v1):
+--
+--   VAL_TUNE : 2024 iso_week  1..20  (tuning of calibration grid)
+--   VAL_GATE : 2024 iso_week 21..27  (clean approval gate — never touched during tuning)
+--   BLIND    : 2024 iso_week 28..40  (ciego — no labels in output)
+--   OTHER    : rest of VAL (training/calib rows pass through unchanged)
+--
+-- CALIBRATION GRID (full cross-join = 216 configurations):
+--
+--   scale_multiplier  ∈ {1.00, 1.03, 1.05, 1.08, 1.10, 1.15}
+--   q90_offset        ∈ {90, 91, 92, 93}   -- percentile of CALIB score used for q90
+--   q95_offset        ∈ {95, 96, 97}
+--   factor_clip_hi    ∈ {3.0, 3.5, 4.0}
+--
+-- SCALE FORMULA (v2):
+--
+--   segment_vif = SQRT(GREATEST(1.0,
+--                   SAFE_DIVIDE(VAR_POP(residual_calib), AVG(POW(scale_v1, 2)))
+--                 ))   -- per segment; fallback: child>=50 → season>=100 → global
+--
+--   scale_h12_v2 = scale_h12_v1
+--                  * LEAST(1.50, GREATEST(1.00, segment_vif))
+--                  * scale_multiplier
+--
+-- CALIBRATION LOSS FUNCTION (minimised over VAL_TUNE):
+--
+--   calibration_loss =
+--     10.0 * ABS(viol_rate_p90 - 0.10)
+--     + 20.0 * GREATEST(viol_rate_p90 - 0.12, 0)
+--     +  5.0 * GREATEST(0.08 - viol_rate_p90, 0)
+--     +  3.0 * GREATEST(q90_p50_ratio_median - 3.0, 0)
+--     +  2.0 * GREATEST(cap_rate_q90 - 0.05, 0)
+--     +  1.0 * ABS(viol_rate_p80 - 0.20)
+--
+-- GATES (evaluated exclusively on VAL_GATE, iso_week 21-27):
+--
+--   B1  leakage_status = PASS
+--   B2  scope_vs_R = OK
+--   B3  viol_rate_p90_VAL_GATE in [0.08, 0.12]
+--   B3b viol_rate_p95_VAL_GATE in [0.03, 0.08]
+--   B3c monotonicity_violations = 0
+--   B3d q90_cap_rate <= 0.05
+--   B3e median(q90/p50) <= 3.0 for amplitude >= 10
+--   B4  lift@100_VAL_GATE > 1.5
+--   B5  brier_calibrated <= brier_raw
+--   B6  WMAPE_VAL_GATE <= WMAPE_h12v1 * 1.10
+--   B7  over_under_ratio_q90 <= 3.0
+--
+-- PROVINCIAL ALLOCATION:
+--
+--   DIM_PROVINCIA_TABLE    = {PROJECT_ID}.{BQ_DATASET}.dim_provincia
+--   GEO_FILTER             = codigonacion = 108  (Spain, 52 provinces)
+--   GEO_JOIN_KEY           = codigo_provincia    (adjust if different in fact table)
+--   DIRICHLET_ALPHA0_SKU   = 10.0
+--   DIRICHLET_ALPHA0_FAM   = 25.0
+--   DIRICHLET_ALPHA0_GLOBAL= 50.0
+--   LOOKBACK_WEEKS         = 52
+--   MIN_HIST_UNITS         = 5.0
+--   MIN_HIST_WEEKS         = 3
+--
+-- BLIND FORECAST:
+--
+--   iso_week BETWEEN 28 AND 40, iso_year = 2024
+--   Generated only if gate_verdict_h12_v2.deployment_decision = 'DEPLOY'
+--   y_true_12w = NULL, stockout_event_12w = NULL (labels masked)
+--   labels_included = FALSE
+--
+-- GUARDRAILS:
+--
+--   DEMAND_ACTIVE_THR_12W   = 10.0
+--   CAP_MULTIPLIER          = 2.0  (inherited from v1; can increase to 2.5 via grid)
+--   OVER_UNDER_RATIO_MAX    = 3.0
+--   Q90_P50_RATIO_MAX       = 3.0
+--
+-- RUNNER:
+--
+--   python sql/bqml/h12_v2/run_h12_v2_pipeline.py --dry-run
+--   python sql/bqml/h12_v2/run_h12_v2_pipeline.py --start-phase 1 --stop-after-phase 2
+--   python sql/bqml/h12_v2/run_h12_v2_pipeline.py
+--
+-- ANTI-MODIFICATION:
+--   h12_v1 tables/models are READ-ONLY from v2.
+--   All v2 output tables use suffix _h12_v2.
+-- ============================================================================

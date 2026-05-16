@@ -63,6 +63,25 @@ logs/
 RESUMEN_EJECUTIVO_H4.md
 SITUACION_PROYECTO.md
 INFORME_FORECAST_H4_COMPLETO.md
+
+# Temporary diagnostic / debugging scripts
+check_auc.py
+check_counts.py
+get_metrics.py
+inspect_audit.py
+inspect_policy.py
+
+# Web / HTML artifacts
+*.htm
+*_files/
+
+# Office documents
+*.docx
+*.pptx
+
+# Output tables (large data)
+outputs/
+
 # Git LFS
 *.pbix
 *.xlsx

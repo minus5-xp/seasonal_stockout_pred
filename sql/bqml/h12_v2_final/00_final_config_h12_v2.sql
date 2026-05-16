@@ -1,0 +1,42 @@
+-- ============================================================================
+-- CONFIG: h12_v2_final PATCH
+-- ============================================================================
+-- PURPOSE: Documentation of the three targeted fixes applied to h12_v2.
+-- This file is NOT executed by the runner (doc only).
+--
+-- SOURCE VERSION:  h12_v2  (tables read-only, never modified)
+-- OUTPUT SUFFIX:   _h12_v2_final
+-- RETRAINING:      NONE
+-- RECALIBRATION:   NONE (q90 not touched)
+--
+-- FIX 1 — BRIER (B5):
+--   brier_v2(Platt) = 0.0805 > brier_raw = 0.06685
+--   Selection rule: use RAW probability for reporting if brier_raw < brier_cal * 1.01.
+--   p_oos_12w_rank    = p_oos_h12 (Platt) if ranking lifts more, else raw
+--   p_oos_12w_report  = selected by brier comparison on VAL_GATE
+--   p_oos_12w_deploy  = p_oos_12w_report
+--
+-- FIX 2 — DIRICHLET RECONCILIATION (D1):
+--   Bug: COALESCE(dirichlet_weight_NULL, 1.0) when sum_raw=0 assigns 1.0 to each province
+--   Fix: proper zero-raw-weight normalisation:
+--     A. sum_raw > 0  → dirichlet_weight_final = raw / SUM(raw)
+--     B. sum_raw = 0, N > 1, sum_prior > 0 → prior / SUM(prior)
+--     C. sum_raw = 0, N > 1, sum_prior = 0 → uniform 1/N
+--     D. sum_raw = 0, N = 1              → 1.0
+--     E. no province                     → 'NACIONAL', weight = 1.0
+--   Tolerance: err_weight <= 1e-9, err_p50/q90/q95 <= 0.001
+--
+-- FIX 3 — RATIO GUARDRAIL (B3e):
+--   q90_p50_ratio_median = 3.68 (WARN) driven by low-volume SKUs.
+--   Do NOT reduce q90. Compute conditional ratio (p50 >= 5).
+--   ratio_gate_final: PASS_ACTIVE_RATIO or WARN_LOW_VOLUME_RATIO (not FAIL).
+--
+-- GATE TARGETS:
+--   deployment_decision_final = DEPLOY_FULL  if all gates A+B+C+D pass
+--   deployment_decision_final = DEPLOY_NATIONAL_ONLY if national PASS, Dirichlet FAIL
+--   deployment_decision_final = HOLD otherwise
+--
+-- RUNNER:
+--   python sql/bqml/h12_v2_final/run_h12_v2_final_pipeline.py --dry-run
+--   python sql/bqml/h12_v2_final/run_h12_v2_final_pipeline.py
+-- ============================================================================

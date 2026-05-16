@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Sistema de Alerta de Rotura de Stock — Diagrama</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: #f1f5f9;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 24px 60px;
+}
+header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+header h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+header p {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-top: 5px;
+}
+.card {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.04);
+  padding: 40px 32px;
+  width: 100%;
+  max-width: 900px;
+}
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+.mermaid svg {
+  font-family: 'Inter', sans-serif !important;
+  max-width: 100%;
+  height: auto;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Sistema de Alerta Anticipada de Rotura de Stock</h1>
+  <p>12 semanas de antelación · 2 445 referencias · 52 provincias · h12_v5_1</p>
+</header>
+
+<div class="card">
+<div class="mermaid">
+flowchart TD
+
+    D["📦 Historial de ventas\nalbaranes y atributos por referencia"]
+
+    UC["🔧 Corrección de demanda real\nEliminamos el efecto de las propias\nroturas pasadas en el historial"]
+
+    subgraph PRED["Predicción"]
+        direction LR
+        CLS["¿Va a haber rotura?\nClasificador de probabilidad\nde rotura a 12 semanas"]
+        REG["¿Cuánto se va a vender?\nPrevisión de demanda\npor referencia y semana"]
+    end
+
+    QUANT["📐 Stock de seguridad\nNivel de stock para cubrir\nel 90% y 95% de escenarios"]
+
+    PROV["🗺️ Desglose provincial\nReparto entre 52 provincias\npor historial propio o patrón de familia"]
+
+    ALERT_BASE["✅ Alertas consolidadas\nReferencias de alta confianza\npolítica v5 probada"]
+
+    subgraph DIFF["Cobertura adicional — estados difíciles"]
+        SCORE["Puntuación de riesgo\ncomparada dentro\ndel mismo estado estacional"]
+        SEL["Selección de la mejor\nregla de activación\n81 combinaciones evaluadas"]
+        ALERT_NEW["🔍 Alertas de estados difíciles\nTemporada baja · Transición\nDemanda irregular"]
+        SCORE --> SEL --> ALERT_NEW
+    end
+
+    COMBINE["🔗 Lista unificada de alertas\nConsolidadas + Estados difíciles"]
+
+    GATE{"7 controles de calidad\nPrecisión · Cobertura · Lift\nIntegridad · Sin datos del futuro"}
+
+    DEPLOY["🚀 Aprobado para producción"]
+    HOLD["⛔ Revisar antes de publicar"]
+
+    OUTPUT["🛒 Buffer de demanda con criticidad\nCRITICAL · HIGH · MEDIUM · LOW\npor referencia · provincia · semana"]
+
+    D --> UC --> PRED
+    CLS --> QUANT
+    REG --> QUANT
+    QUANT --> PROV
+    PROV --> ALERT_BASE
+    PROV --> DIFF
+    ALERT_BASE --> COMBINE
+    ALERT_NEW --> COMBINE
+    COMBINE --> GATE
+    GATE -->|"Todos los controles OK"| DEPLOY
+    GATE -->|"Algún control falla"| HOLD
+    DEPLOY --> OUTPUT
+
+    style PRED fill:#eff6ff,stroke:#bfdbfe,color:#1d4ed8
+    style DIFF fill:#f0fdf4,stroke:#bbf7d0,color:#166534
+    style DEPLOY fill:#166534,stroke:#16a34a,color:#fff
+    style HOLD fill:#991b1b,stroke:#dc2626,color:#fff
+    style OUTPUT fill:#0f766e,stroke:#0d9488,color:#fff
+    style GATE fill:#fffbeb,stroke:#fde68a,color:#92400e
+</div>
+</div>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'base',
+  themeVariables: {
+    fontFamily: 'Inter, sans-serif',
+    fontSize: '14px',
+    primaryColor: '#e2e8f0',
+    primaryTextColor: '#0f172a',
+    primaryBorderColor: '#94a3b8',
+    lineColor:  '#64748b',
+    secondaryColor: '#f8fafc',
+    tertiaryColor:  '#f1f5f9',
+    background:     '#ffffff',
+    mainBkg:        '#f1f5f9',
+    clusterBkg:     '#f8fafc',
+    clusterBorder:  '#94a3b8',
+    titleColor:     '#334155',
+    edgeLabelBackground: '#f8fafc',
+    nodeBorder:     '#94a3b8',
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+-- ============================================================================
+-- CONFIG BLOCK h=12 v1
+-- ============================================================================
+-- All scripts in sql/bqml/h12_v1/ use the constants declared below.
+-- This file is DOCUMENTATION ONLY — not executed by the runner.
+-- Execute scripts 01..09 in order via run_h12_v1_pipeline.py.
+-- ============================================================================
+--
+-- CANONICAL CONSTANTS:
+--
+--   PROJECT_ID              = 'thequantitativeledger'
+--   BQ_DATASET              = 'cruzber_models_eu'
+--   BASE_SALES_TABLE        = <required — no default>
+--   BQ_LOCATION             = 'EU'
+--   HORIZON_WEEKS           = 12
+--   VERSION_TAG             = 'h12_v1'
+--
+-- TEMPORAL ALIGNMENT (matches R script 30_Dense_Panel_12W_Unified_Best.R):
+--
+--   TRAIN_START_DATE        = '2021-01-04'   -- ISO week 1, 2021
+--   TRAIN_END_DATE          = '2023-06-30'   -- end of H1 2023
+--   CALIB_START_DATE        = '2023-07-01'
+--   CALIB_END_DATE          = '2023-12-31'
+--   VAL_START_DATE          = '2024-01-01'
+--   VAL_END_DATE            = '2024-12-29'   -- ISO week 52, 2024
+--
+--   TRAIN + CALIB = 2021–2023 conceptually (mirrors R training set)
+--   VAL           = 2024      (mirrors R test set)
+--
+-- TARGET DEFINITION (CRITICAL — not point forecast at t+12):
+--
+--   y_true_12w = SUM(y_sales) for decision_week+1 through decision_week+12
+--
+--   stockout_event_12w  = MAX(stockout_event_week) over t+1..t+12  (binary)
+--   n_stockout_weeks_12w = SUM(stockout_event_week) over t+1..t+12 (count 0..12)
+--   lost_units_proxy_12w = SUM proxy of demand not served due to OOS weeks
+--
+--   Rows are included only when all 12 future weeks are observable (n_future_obs=12).
+--   This is equivalent to drop_na(target_12w_ahead) in the R script.
+--
+-- CALENDAR:
+--   The weekly spine must extend to VAL_END_DATE + 20 weeks so that
+--   the 12-week forward join can always find all 12 future rows.
+--
+-- ACTIVE DEMAND SCOPE (for conformal + coverage gates):
+--
+--   DEMAND_ACTIVE_THRESHOLD_12W = 10.0   (amplitude >= 10 units cumulative proxy)
+--   (Note: H4 used 5.0; H12 uses 10.0 to reflect larger 12-week aggregation)
+--
+-- CONFORMAL / QUANTILE PARAMETERS:
+--
+--   CAP_MULTIPLIER          = 2.0          -- q* cap = 2.0 * TRAIN+CALIB 99th pct
+--   MIN_N_TUNE              = 50           -- min obs in VAL_TUNE for segment factor (tuned v1.1)
+--   FACTOR_CLIP_LO          = 0.80         -- lower clip on correction_factor
+--   FACTOR_CLIP_HI          = 3.00         -- upper clip (tuned v1.1: viol_p90=0.15 observed)
+--   VOLATILITY_NTILE        = 5            -- volatility bucket NTILE
+--
+-- COVERAGE GATES:
+--
+--   B3_LO                   = 0.08         -- Gate B3 lower bound viol_rate_p90
+--   B3_HI                   = 0.12         -- Gate B3 upper bound viol_rate_p90
+--   B4_LIFT_THRESHOLD       = 1.5          -- Gate B4 minimum lift@100
+--
+-- SCALE (heteroscedastic, adjusted for 12W aggregation):
+--
+--   scale = GREATEST(1.0,
+--             roll13_std * SQRT(12.0),
+--             SQRT(roll13_mean * 12.0 + 1.0))
+--
+-- OOS PROXY (per-week signal, then aggregated):
+--
+--   stockout_event_week =
+--     y_sales = 0
+--     AND ever_sold_before = 1
+--     AND (sale_freq_12w > 0.25 OR roll4_mean > 5 OR lag_1 > 5 OR roll13_mean > 5)
+--
+-- QUANTILES PRODUCED:
+--   q75_12w, q80_12w, q85_12w, q90_12w, q95_12w, q99_12w
+--
+-- POLICIES:
+--   policy_A : p_oos_h12 * GREATEST(q95_12w - yhat_p50_12w, 0)
+--   policy_B : p_oos_h12 * q90_12w
+--   policy_C : POW(p_oos_h12, gamma) * GREATEST(q95_12w - yhat_p50_12w, 0), gamma in {0.5, 1.0, 1.5}
+--   policy_D : p_oos_h12 * lost_units_proxy_12w
+--   policy_E : p_oos_h12 * q90_12w * activity_weight
+--
+-- PIPELINE EXECUTION ORDER:
+--   01_build_weekly_features_h12_v1.sql   -- dense spine + features + 12W labels
+--   02_train_models_h12_v1.sql            -- OOS classifier + Platt + demand regressor
+--   02b_score_models_h12_v1.sql           -- score all splits
+--   03_residuals_quantile_lookup_h12_v1.sql
+--   04_conformal_calibration_h12_v1.sql
+--   05_forecast_h12_v1.sql
+--   06_policy_sweep_alerts_h12_v1.sql
+--   07_coverage_gate_h12_v1.sql
+--   08_alerts_eval_leakage_h12_v1.sql
+--   09_run_summary_h12_v1.sql
+--
+-- RUNNER:
+--   python run_h12_v1_pipeline.py --dry-run
+--   BASE_SALES_TABLE=... python run_h12_v1_pipeline.py
+--
+-- ANTI-MODIFICATION NOTICE:
+--   Do NOT modify tables in sql/bqml/h4_v4/ from this pipeline.
+--   H12 tables use suffix _h12_v1 exclusively.
+-- ============================================================================

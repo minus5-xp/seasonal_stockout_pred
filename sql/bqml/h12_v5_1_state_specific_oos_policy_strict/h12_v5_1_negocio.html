@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Sistema de Alerta de Rotura de Stock — h12_v5_1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #f1f5f9;
+  --card:     #ffffff;
+  --border:   #e2e8f0;
+  --text:     #0f172a;
+  --muted:    #64748b;
+  --green:    #166534;
+  --green-l:  #f0fdf4;
+  --green-b:  #bbf7d0;
+  --blue:     #1d4ed8;
+  --blue-l:   #eff6ff;
+  --blue-b:   #bfdbfe;
+  --amber:    #92400e;
+  --amber-l:  #fffbeb;
+  --amber-b:  #fde68a;
+  --teal:     #0f766e;
+  --teal-l:   #f0fdfa;
+  --teal-b:   #99f6e4;
+  --red:      #991b1b;
+  --red-l:    #fef2f2;
+  --red-b:    #fecaca;
+  --slate:    #334155;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 48px 24px 80px;
+}
+
+/* ── HEADER ── */
+.header {
+  max-width: 860px;
+  margin: 0 auto 48px;
+  text-align: center;
+}
+.header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+}
+.header .subtitle {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.6;
+}
+.header-kpis {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.kpi-chip {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 20px;
+  text-align: center;
+}
+.kpi-chip .kpi-val {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.kpi-chip .kpi-lbl {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* ── SECTION LABEL ── */
+.slabel {
+  max-width: 860px;
+  margin: 0 auto 14px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── PIPELINE ── */
+.pipeline {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 16px;
+  position: relative;
+}
+.step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 27px;
+  top: 56px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--border);
+  z-index: 0;
+}
+
+.step-num-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 18px;
+  position: relative;
+  z-index: 1;
+}
+.num-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--card);
+  border: 2px solid var(--border);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.step-body {
+  padding: 14px 0 28px;
+}
+.step-card {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 26px;
+  transition: box-shadow .15s;
+}
+
+/* step themes */
+.s0 .num-circle { background: var(--blue-l);  border-color: var(--blue-b);  color: var(--blue); }
+.s0 .step-card  { border-left: 4px solid var(--blue); }
+
+.s1 .num-circle { background: var(--blue-l);  border-color: var(--blue-b);  color: var(--blue); }
+.s1 .step-card  { border-left: 4px solid var(--blue); }
+
+.s2 .num-circle { background: var(--amber-l); border-color: var(--amber-b); color: var(--amber); }
+.s2 .step-card  { border-left: 4px solid #f59e0b; }
+
+.s3 .num-circle { background: var(--amber-l); border-color: var(--amber-b); color: var(--amber); }
+.s3 .step-card  { border-left: 4px solid #f59e0b; }
+
+.s4 .num-circle { background: var(--teal-l);  border-color: var(--teal-b);  color: var(--teal); }
+.s4 .step-card  { border-left: 4px solid var(--teal); }
+
+.s5 .num-circle { background: var(--green-l); border-color: var(--green-b); color: var(--green); }
+.s5 .step-card  { border-left: 4px solid #16a34a; }
+
+.s6 .num-circle { background: var(--green-l); border-color: var(--green-b); color: var(--green); }
+.s6 .step-card  { border-left: 4px solid #16a34a; }
+
+.s7 .num-circle { background: #fdf4ff; border-color: #e9d5ff; color: #7c3aed; font-size:.65rem; }
+.s7 .step-card  { border-left: 4px solid #7c3aed; }
+
+/* step header */
+.step-phase {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.step-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.step-desc {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.65;
+  margin-bottom: 16px;
+}
+
+/* inner content */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid;
+}
+.pill-blue   { background: var(--blue-l);  border-color: var(--blue-b);  color: var(--blue); }
+.pill-amber  { background: var(--amber-l); border-color: var(--amber-b); color: var(--amber); }
+.pill-green  { background: var(--green-l); border-color: var(--green-b); color: var(--green); }
+.pill-red    { background: var(--red-l);   border-color: var(--red-b);   color: var(--red); }
+.pill-teal   { background: var(--teal-l);  border-color: var(--teal-b);  color: var(--teal); }
+.pill-slate  { background: #f8fafc; border-color: var(--border); color: var(--slate); }
+
+.info-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.info-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.info-box-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.info-box ul {
+  list-style: none;
+}
+.info-box li {
+  font-size: 0.8rem;
+  color: var(--text);
+  padding: 3px 0;
+  padding-left: 14px;
+  position: relative;
+  line-height: 1.45;
+}
+.info-box li::before {
+  content: '›';
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* combine logic */
+.combine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: var(--teal-l);
+  border: 1.5px solid var(--teal-b);
+  border-radius: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.combine-box-item {
+  background: white;
+  border: 1px solid var(--teal-b);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  text-align: center;
+  flex: 1;
+  min-width: 140px;
+}
+.combine-box-item .label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 3px;
+}
+.combine-op-badge {
+  background: var(--teal);
+  color: white;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.combine-result {
+  background: var(--teal);
+  color: white;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  flex: 1;
+  min-width: 160px;
+}
+
+/* verdict cards */
+.verdict-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.verdict-box {
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid;
+}
+.verdict-box h4 { font-size: 0.82rem; font-weight: 700; margin-bottom: 4px; }
+.verdict-box p  { font-size: 0.76rem; color: var(--muted); line-height: 1.4; }
+.vd-1 { background: var(--green-l); border-color: var(--green-b); }
+.vd-1 h4 { color: var(--green); }
+.vd-2 { background: var(--amber-l); border-color: var(--amber-b); }
+.vd-2 h4 { color: var(--amber); }
+.vd-3 { background: var(--red-l); border-color: var(--red-b); }
+.vd-3 h4 { color: var(--red); }
+.vd-4 { background: #f8fafc; border-color: var(--border); }
+.vd-4 h4 { color: var(--slate); }
+
+/* audit checks */
+.audit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.audit-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: var(--green-l);
+  border: 1px solid var(--green-b);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.audit-item .icon { flex-shrink: 0; }
+.audit-item strong { display: block; color: var(--green); font-size: 0.75rem; margin-bottom: 2px; }
+
+/* separator arrow */
+.flow-arrow {
+  max-width: 860px;
+  margin: 0 auto;
+  text-align: center;
+  font-size: 1.2rem;
+  color: var(--border);
+  padding: 2px 0;
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>Sistema de Alerta Anticipada de Rotura de Stock</h1>
+  <div class="subtitle">
+    Detecta con 12 semanas de antelación qué productos corren riesgo de rotura en cada provincia,<br>
+    priorizando las acciones de reposición según el impacto económico en ventas.
+  </div>
+  <div class="header-kpis">
+    <div class="kpi-chip">
+      <div class="kpi-val">12 sem</div>
+      <div class="kpi-lbl">horizonte de predicción</div>
+    </div>
+    <div class="kpi-chip">
+      <div class="kpi-val">2 445</div>
+      <div class="kpi-lbl">referencias activas</div>
+    </div>
+    <div class="kpi-chip">
+      <div class="kpi-val">52</div>
+      <div class="kpi-lbl">provincias</div>
+    </div>
+    <div class="kpi-chip">
+      <div class="kpi-val">119 857</div>
+      <div class="kpi-lbl">observaciones analizadas</div>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE -->
+<div class="slabel">Cómo funciona el modelo — 8 pasos</div>
+<div class="pipeline">
+
+  <!-- STEP 0 -->
+  <div class="step s0">
+    <div class="step-num-col"><div class="num-circle">1</div></div>
+    <div class="step-body">
+      <div class="step-card">
+        <div class="step-phase">Punto de partida</div>
+        <div class="step-title">Herencia de las alertas consolidadas del modelo anterior</div>
+        <div class="step-desc">
+          El modelo arranca con las alertas ya validadas de la versión v5, que funciona bien en condiciones normales.
+          Cada referencia se clasifica: las que ya tienen alerta confirmada quedan congeladas; las que presentan señales de riesgo pero no fueron capturadas se marcan como «casos difíciles» para el siguiente paso.
+        </div>
+        <div class="info-row">
+          <div class="info-box">
+            <div class="info-box-title">Señales de riesgo que se evalúan</div>
+            <ul>
+              <li>Semanas consecutivas sin ventas</li>
+              <li>Brecha entre demanda esperada y ventas reales</li>
+              <li>Historial de ventas positivas previas</li>
+              <li>Comportamiento estacional del artículo</li>
+              <li>Probabilidad de rotura acumulada</li>
+              <li>Caída brusca de ventas reciente</li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Resultado de este paso</div>
+            <ul>
+              <li>Referencias con <strong>alerta estable</strong> — política v5 confirmada, no se tocan</li>
+              <li>Referencias <strong>candidatas difíciles</strong> — tienen señal de riesgo pero no se alertaron: pasan al análisis especial</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step s1">
+    <div class="step-num-col"><div class="num-circle">2</div></div>
+    <div class="step-body">
+      <div class="step-card">
+        <div class="step-phase">Análisis de referencias difíciles</div>
+        <div class="step-title">Puntuación de riesgo dentro de cada estado estacional</div>
+        <div class="step-desc">
+          Los artículos difíciles se puntúan comparándolos <em>solo con otros artículos en el mismo estado estacional</em>.
+          Un artículo en temporada baja con cero ventas no es lo mismo que uno en temporada alta con cero ventas —
+          el sistema lo distingue. Se construye una puntuación compuesta de riesgo entre 0 y 1 para cada candidato.
+        </div>
+        <div class="pills">
+          <span class="pill pill-blue">Rachas de cero ventas</span>
+          <span class="pill pill-blue">Ventas perdidas esperadas</span>
+          <span class="pill pill-blue">Señal de rotura acumulada</span>
+          <span class="pill pill-blue">Probabilidad OOS horizonte 12 sem</span>
+          <span class="pill pill-blue">Prioridad de auditoría</span>
+        </div>
+        <div class="info-box" style="margin-bottom:0">
+          <div class="info-box-title">Por qué se compara dentro del mismo estado</div>
+          <ul>
+            <li>Un artículo de temporada baja tiene un 87% de semanas sin ventas de forma natural — eso no es una alerta</li>
+            <li>El sistema detecta el 13% de casos anómalos <em>dentro</em> de ese grupo, no los confunde con el resto</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step s2">
+    <div class="step-num-col"><div class="num-circle">3</div></div>
+    <div class="step-body">
+      <div class="step-card">
+        <div class="step-phase">Diseño de políticas</div>
+        <div class="step-title">Creación de 81 reglas de alerta candidatas</div>
+        <div class="step-desc">
+          Para encontrar la mejor regla de activación de alertas difíciles, el sistema genera automáticamente
+          81 combinaciones distintas variando tres palancas: qué tan exigentes son los filtros de entrada,
+          qué umbral de riesgo activa la alerta y cuántas alertas se permiten por semana.
+        </div>
+        <div class="info-row">
+          <div class="info-box">
+            <div class="info-box-title">Nivel de exigencia del filtro</div>
+            <ul>
+              <li>Conservador — solo los casos más claros</li>
+              <li>Moderado — equilibrio entre cobertura y ruido</li>
+              <li>Exploratorio — red más amplia</li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Umbral de activación</div>
+            <ul>
+              <li>Alto — top 2% de riesgo</li>
+              <li>Medio — top 5% de riesgo</li>
+              <li>Bajo — top 10% de riesgo</li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Volumen de alertas por semana</div>
+            <ul>
+              <li>Reducido — 5 a 8 referencias/semana</li>
+              <li>Estándar — 10 a 15 referencias/semana</li>
+              <li>Ampliado — hasta 30 referencias/semana</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step s3">
+    <div class="step-num-col"><div class="num-circle">4</div></div>
+    <div class="step-body">
+      <div class="step-card">
+        <div class="step-phase">Selección de la mejor política</div>
+        <div class="step-title">Evaluación de las 81 reglas en datos de validación y elección de la óptima</div>
+        <div class="step-desc">
+          Cada una de las 81 reglas se prueba en un conjunto de datos históricos reservado exclusivamente para este paso —
+          nunca usado para entrenar ni para la evaluación final. Se mide cuántas roturas reales adicionales detecta
+          cada regla, con qué precisión y cuántas falsas alarmas genera. La regla que minimiza el «coste de selección»
+          se congela para producción.
+        </div>
+        <div class="info-row">
+          <div class="info-box">
+            <div class="info-box-title">Qué se mide en cada regla</div>
+            <ul>
+              <li>Roturas adicionales detectadas vs política base</li>
+              <li>Precisión — de cada alerta, cuántas son roturas reales</li>
+              <li>Cobertura — qué % de roturas reales se capturan</li>
+              <li>Ventas en riesgo recuperadas por las nuevas alertas</li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Garantía de imparcialidad</div>
+            <ul>
+              <li>Los datos de evaluación final (LOCKED_TEST) están completamente bloqueados en este paso</li>
+              <li>La elección no puede estar influenciada por el resultado final</li>
+              <li>Se elige UNA política definitiva y queda congelada</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step s4">
+    <div class="step-num-col"><div class="num-circle">5</div></div>
+    <div class="step-body">
+      <div class="step-card">
+        <div class="step-phase">Generación de alertas</div>
+        <div class="step-title">Combinación de alertas estables y alertas de estados difíciles</div>
+        <div class="step-desc">
+          Con la regla elegida, se aplica a todos los períodos y se combinan las alertas consolidadas (v5)
+          con las nuevas alertas de estados difíciles. El resultado es una lista unificada en la que cada
+          alerta indica su origen: «alerta consolidada» o «alerta de estado difícil».
+        </div>
+        <div class="combine">
+          <div class="combine-box-item">
+            <span class="label">Alertas consolidadas</span>
+            Alta precisión · política v5 probada
+          </div>
+          <div class="combine-op-badge">+</div>
+          <div class="combine-box-item">
+            <span class="label">Alertas difíciles</span>
+            Cobertura adicional · estados estacionales complejos
+          </div>
+          <div style="color:var(--teal);font-size:1.2rem;font-weight:700;">→</div>
+          <div class="combine-result">
+            Lista unificada de alertas<br>
+            <span style="font-weight:400;font-size:0.72rem;">con origen y prioridad de cada una</span>
+          </div>
+        </div>
+        <div class="info-box">
+          <div class="info-box-title">Estados estacionales que cubre la política nueva</div>
+          <ul>
+            <li>Artículos fuera de temporada activa</li>
+            <li>Artículos en transición de entrada o salida de temporada</li>
+            <li>Artículos con demanda intermitente o irregular</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step s5">
+    <div class="step-num-col"><div class="num-circle">6</div></div>
+    <div class="step-body">
+      <div class="step-card">
+        <div class="step-phase">Validación final</div>
+        <div class="step-title">Medición del rendimiento real sobre datos de test bloqueados</div>
+        <div class="step-desc">
+          Por primera vez se abren los datos de evaluación final. Se mide el rendimiento del sistema completo
+          de forma segmentada: por temporada, por tipo de artículo y por origen de la alerta. Es la única vez
+          que se accede a estos datos — ningún ajuste posterior es posible.
+        </div>
+        <div class="info-row">
+          <div class="info-box">
+            <div class="info-box-title">Segmentos evaluados</div>
+            <ul>
+              <li>Resultado global del sistema</li>
+              <li>Por temporada (alta, baja, transición)</li>
+              <li>Por los 9 estados estacionales de cada artículo</li>
+              <li>Por origen de alerta (consolidada vs difícil)</li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Indicadores clave</div>
+            <ul>
+              <li>% de roturas reales detectadas (cobertura)</li>
+              <li>% de alertas que son roturas reales (precisión)</li>
+              <li>Veces que supera al azar (lift)</li>
+              <li>Ventas en riesgo recuperadas por las alertas</li>
+              <li>Top 50 / 100 / 200 / 500 referencias más críticas</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step s6">
+    <div class="step-num-col"><div class="num-circle">7</div></div>
+    <div class="step-body">
+      <div class="step-card">
+        <div class="step-phase">Decisión de despliegue</div>
+        <div class="step-title">¿Aporta valor real la política adicional?</div>
+        <div class="step-desc">
+          Antes de poner en producción las nuevas alertas de estados difíciles, el sistema evalúa si su
+          aportación incremental justifica el despliegue. Se genera un veredicto formal basado en métricas objetivas.
+        </div>
+        <div class="verdict-row">
+          <div class="verdict-box vd-1">
+            <h4>Desplegar en producción</h4>
+            <p>El valor incremental es claro y consistente. Las alertas difíciles mejoran materialmente la cobertura de roturas.</p>
+          </div>
+          <div class="verdict-box vd-2">
+            <h4>Probar en paralelo</h4>
+            <p>Valor moderado. Se recomienda ejecutar en modo sombra para confirmar comportamiento antes de activar en producción.</p>
+          </div>
+          <div class="verdict-box vd-3">
+            <h4>No desplegar</h4>
+            <p>Sin valor incremental demostrado. Las nuevas alertas añaden ruido sin mejorar la cobertura real.</p>
+          </div>
+          <div class="verdict-box vd-4">
+            <h4>Mantener solo base</h4>
+            <p>El modelo base (v5) es suficiente. No se necesita la política de estados difíciles.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="step s7">
+    <div class="step-num-col"><div class="num-circle">8</div></div>
+    <div class="step-body">
+      <div class="step-card">
+        <div class="step-phase">Salida operativa</div>
+        <div class="step-title">Buffer de demanda con calificación de criticidad</div>
+        <div class="step-desc">
+          La salida final es una lista priorizada de referencias con su nivel de urgencia,
+          ordenada por el impacto esperado en ventas. El equipo de compras recibe exactamente
+          las referencias que necesita reponer, en qué provincia y con qué prioridad.
+        </div>
+        <div class="info-row">
+          <div class="info-box">
+            <div class="info-box-title">Niveles de criticidad</div>
+            <ul>
+              <li><strong style="color:#991b1b">CRITICAL</strong> — probabilidad de rotura ≥ 80%</li>
+              <li><strong style="color:#92400e">HIGH</strong> — probabilidad de rotura ≥ 60%</li>
+              <li><strong style="color:#1d4ed8">MEDIUM</strong> — probabilidad de rotura ≥ 40%</li>
+              <li><strong style="color:#166534">LOW</strong> — probabilidad de rotura &lt; 40%</li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Qué incluye cada alerta</div>
+            <ul>
+              <li>Referencia y provincia</li>
+              <li>Demanda prevista (P50) y nivel de seguridad (Q90)</li>
+              <li>Unidades de buffer recomendadas = Q90 − P50</li>
+              <li>Puntuación de prioridad de reposición</li>
+              <li>Origen: alerta consolidada o alerta difícil</li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Listas disponibles</div>
+            <ul>
+              <li>Top 50 / 100 / 200 / 500 / 1 000 referencias</li>
+              <li>Vista combinada (todos los orígenes)</li>
+              <li>Vista solo alertas consolidadas</li>
+              <li>Vista solo alertas difíciles (nuevo)</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- AUDIT SUMMARY -->
+        <div style="margin-top:18px">
+          <div class="info-box-title" style="margin-bottom:10px">Garantías de fiabilidad del sistema</div>
+          <div class="audit-grid">
+            <div class="audit-item">
+              <div class="icon">✅</div>
+              <div><strong>Sin trampa temporal</strong>El sistema no usa información del futuro para tomar decisiones del pasado</div>
+            </div>
+            <div class="audit-item">
+              <div class="icon">✅</div>
+              <div><strong>Selección imparcial</strong>La política se elige en datos separados, nunca en los datos de test final</div>
+            </div>
+            <div class="audit-item">
+              <div class="icon">✅</div>
+              <div><strong>Evaluación one-shot</strong>Los datos de test se abren una sola vez — sin posibilidad de ajuste posterior</div>
+            </div>
+            <div class="audit-item">
+              <div class="icon">✅</div>
+              <div><strong>Sin contaminación de períodos</strong>Los percentiles de riesgo se calculan por período, no mezclando pasado y futuro</div>
+            </div>
+            <div class="audit-item">
+              <div class="icon">✅</div>
+              <div><strong>Política congelada</strong>Los parámetros de producción no cambian una vez seleccionados</div>
+            </div>
+            <div class="audit-item">
+              <div class="icon">✅</div>
+              <div><strong>Auditoría automática</strong>15+ verificaciones ejecutadas en cada run para confirmar la integridad del proceso</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /pipeline -->
+</body>
+</html>
