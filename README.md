@@ -51,6 +51,48 @@ Las métricas de alerta (P/R/F1) evalúan la **política desplegada** (umbral + 
 
 ---
 
+## Evaluación económica (LOCKED TEST S1–S27 2024)
+
+Cruce entre los 214 916 registros de `base_scores_h12_v5_2_strict` (BQ) y la tabla de costes de oportunidad ex-post por SKU × semana × provincia. Cobertura del join: **42% sobre alertas TP**, **59% sobre FN** (el 51–58% restante son SKUs sin datos de precio/margen en el período).
+
+### Escenarios de recuperación — 17 711 verdaderos positivos (TP)
+
+| Escenario | Base de cálculo | Valor estimado |
+|-----------|----------------|----------------|
+| **Bajo** | Ventas perdidas confirmadas ex-post (ajustado por cobertura) | **€1.28M** |
+| **Central** | Coste de oportunidad esperado (`p_oos × precio × demanda esperada`) | **€5.02M** |
+| **Alto** | Margen en riesgo máximo si toda la demanda se pierde | **€8.29M** |
+
+### Visión de mercado total (TP + FN)
+
+| | Ex-post escalado | Escenario central |
+|--|---|---|
+| **Total mercado en riesgo** | €3.21M | €12.51M |
+| → Capturado por alertas (TP) | **€1.28M** | **€5.02M** |
+| → Pérdida residual no alertada (FN) | €1.94M | €7.49M |
+| **Recall económico** | **39.7%** | **40.1%** |
+
+> El recall económico (40%) supera ligeramente el recall de alertas (35.2%), lo que indica que el modelo prioriza correctamente los SKUs de mayor impacto financiero.
+
+### Desglose por clase ABC (ex-post, TP con datos financieros)
+
+| Clase | € recuperado | Alertas TP |
+|-------|-------------|------------|
+| **A** | €395 241 (74%) | 3 954 |
+| B | €115 685 (22%) | 2 468 |
+| C | €20 077 (4%) | 944 |
+
+La clase A concentra el **74% del valor recuperado** con el 53% de las alertas TP, validando la priorización por impacto económico del modelo.
+
+### Desglose por estado de temporada (ex-post, TP con datos financieros)
+
+| Temporada | € recuperado |
+|-----------|--------------|
+| REST | €458 514 |
+| HIGH_SEASON | €72 490 |
+
+---
+
 ## Arquitectura del pipeline h=12
 
 La cadena completa tiene 6 versiones iterativas, cada una con 10–11 fases de SQL/Python ejecutadas en BigQuery:
@@ -209,7 +251,7 @@ python sql/bqml/h12_v5_2_recall_safe_oos_policy_strict/run_h12_v5_2_recall_safe_
 | Dataset | `cruzber_models_eu` |
 | Location | `EU` |
 | Tabla fuente | `fact_lineas_albaran` |
-| Modelo BQML | `m_oos_h12_v3_2` (BOOSTED_TREE_CLASSIFIER) |
+| Modelo BQML | `m_oos_h12_v1` (BOOSTED_TREE_CLASSIFIER) |
 
 ---
 
